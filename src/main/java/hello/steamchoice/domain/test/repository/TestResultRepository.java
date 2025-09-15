@@ -1,0 +1,10 @@
+package hello.steamchoice.domain.test.repository;
+
+import hello.steamchoice.domain.test.entity.TestResult;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+
+public interface TestResultRepository extends JpaRepository<TestResult, Long> {
+    List<TestResult> findBySteamId(String steamId);
+}
