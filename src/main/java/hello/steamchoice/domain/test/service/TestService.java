@@ -4,6 +4,7 @@ import hello.steamchoice.domain.game.entity.UserGame;
 import hello.steamchoice.domain.game.repository.UserGameRepository;
 import hello.steamchoice.domain.test.entity.TestResult;
 import hello.steamchoice.domain.test.repository.TestResultRepository;
+import hello.steamchoice.infrastructure.SteamStoreApiClient;
 import hello.steamchoice.presentation.dto.TestResultRadarResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ public class TestService {
 
     private final UserGameRepository userGameRepository;
     private final TestResultRepository testResultRepository;
+    private final SteamStoreApiClient steamStoreApiClient;
 
     @Transactional
     public TestResultRadarResponse analyze(String steamId) {
@@ -102,14 +104,7 @@ public class TestService {
         List<String> labels = List.of("Collector", "Achiever", "Explorer", "Socializer", "Killer");
         List<Integer> data = labels.stream().map(scores::get).toList();
 
-        List<String> recommendedGames = switch (bestType) {
-            case "Collector" -> List.of("SteamWorld Collection", "Civilization VI", "No Man's Sky");
-            case "Achiever"  -> List.of("Dark Souls III", "Hollow Knight", "The Binding of Isaac");
-            case "Explorer"  -> List.of("Skyrim", "The Witcher 3", "Elden Ring");
-            case "Socializer" -> List.of("Among Us", "Sea of Thieves", "Fall Guys");
-            case "Killer"    -> List.of("CS:GO", "Dota 2", "PUBG");
-            default -> List.of("Stardew Valley");
-        };
+        List<String> recommendedGames = recommendGamesByType(bestType);
 
         return new TestResultRadarResponse(
                 steamId,
@@ -120,5 +115,34 @@ public class TestService {
                 recommendedGames,
                 result.getCreatedAt()
         );
+    }
+
+    /**
+     * 성향별 추천 게임 가져오기 (Steam Store API 활용)
+     */
+    private List<String> recommendGamesByType(String type) {
+        Map<String, Object> categories = steamStoreApiClient.getFeaturedCategories();
+
+        // featured categories → 예: top_sellers, specials, coming_soon
+        Map<?, ?> topSellers = (Map<?, ?>) categories.get("top_sellers");
+        List<?> items = (List<?>) topSellers.get("items");
+
+        // 성향별 키워드 매핑
+        List<String> keywords = switch (type) {
+            case "Collector" -> List.of("Strategy", "Simulation");
+            case "Achiever"  -> List.of("Roguelike", "Action", "Souls");
+            case "Explorer"  -> List.of("RPG", "Adventure", "Open World");
+            case "Socializer" -> List.of("Multiplayer", "Co-op");
+            case "Killer"    -> List.of("FPS", "MOBA", "Competitive");
+            default -> List.of("Indie");
+        };
+
+        // 인기작 중에서 태그/이름에 키워드 포함된 게임만 추천
+        return items.stream()
+                .map(o -> (Map<?, ?>) o)
+                .map(game -> (String) game.get("name"))
+                .filter(name -> keywords.stream().anyMatch(name::contains))
+                .limit(5)
+                .toList();
     }
 }
