@@ -122,33 +122,58 @@ public class TestService {
      * 성향별 추천 게임 가져오기 (Steam Store API 활용)
      */
     private List<String> recommendGamesByType(String type, String steamId) {
-        // 유저가 보유한 게임 appId 목록
+        // 1. 유저 보유 게임
         Set<Long> ownedAppIds = userGameRepository.findBySteamId(steamId).stream()
                 .map(UserGame::getAppId)
                 .collect(Collectors.toSet());
 
-        // Steam Store 인기 게임 카테고리 가져오기
+        // 2. 인기 게임 후보 가져오기
         Map<String, Object> categories = steamStoreApiClient.getFeaturedCategories();
         Map<?, ?> topSellers = (Map<?, ?>) categories.get("top_sellers");
         List<?> items = (List<?>) topSellers.get("items");
 
-        // 성향별 키워드 매핑
-        List<String> keywords = switch (type) {
+        // 3. 성향별 장르 매핑
+        List<String> targetGenres = switch (type) {
             case "Collector" -> List.of("Strategy", "Simulation");
-            case "Achiever"  -> List.of("Roguelike", "Action", "Souls");
+            case "Achiever"  -> List.of("Action", "Roguelike", "Souls-like");
             case "Explorer"  -> List.of("RPG", "Adventure", "Open World");
             case "Socializer" -> List.of("Multiplayer", "Co-op");
-            case "Killer"    -> List.of("FPS", "MOBA", "Competitive");
+            case "Killer"    -> List.of("FPS", "MOBA", "Shooter");
             default -> List.of("Indie");
         };
 
-        // 보유 게임 제외 + 키워드 필터링
-        return items.stream()
-                .map(o -> (Map<?, ?>) o)
-                .filter(game -> !ownedAppIds.contains(((Number) game.get("id")).longValue())) // ❌ 보유 게임 제외
-                .map(game -> (String) game.get("name"))
-                .filter(name -> keywords.stream().anyMatch(name::contains))
-                .limit(5)
-                .toList();
+        // 4. 후보군 필터링
+        List<String> recommended = new ArrayList<>();
+
+        for (Object o : items) {
+            Map<?, ?> game = (Map<?, ?>) o;
+            Long appId = ((Number) game.get("id")).longValue();
+
+            // 보유 게임 제외
+            if (ownedAppIds.contains(appId)) continue;
+
+            // 5. 상세 정보에서 장르 확인
+            Map<String, Object> details = steamStoreApiClient.getGameDetails(appId);
+            Map<?, ?> gameData = (Map<?, ?>) details.get(String.valueOf(appId));
+
+            if (gameData == null || !(Boolean) gameData.get("success")) continue;
+
+            Map<?, ?> data = (Map<?, ?>) gameData.get("data");
+            List<Map<String, String>> genres = (List<Map<String, String>>) data.get("genres");
+
+            if (genres == null) continue;
+
+            boolean matches = genres.stream()
+                    .map(g -> g.get("description"))
+                    .anyMatch(targetGenres::contains);
+
+            if (matches) {
+                recommended.add((String) data.get("name"));
+            }
+
+            if (recommended.size() >= 5) break; // 최대 5개 추천
+        }
+
+        return recommended;
     }
 }
