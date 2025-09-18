@@ -1,7 +1,7 @@
 package hello.steamchoice.presentation;
 
 import hello.steamchoice.domain.test.service.TestService;
-import hello.steamchoice.presentation.dto.TestResultResponse;
+import hello.steamchoice.presentation.dto.TestResultRadarResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,7 +17,7 @@ public class TestController {
     private final TestService testService;
 
     @PostMapping("/{steamId}")
-    public ResponseEntity<TestResultResponse> analyze(@PathVariable String steamId) {
+    public ResponseEntity<TestResultRadarResponse> analyze(@PathVariable String steamId) {
         return ResponseEntity.ok(testService.analyze(steamId));
     }
 }
