@@ -24,7 +24,7 @@ public class TestService {
         List<UserGame> games = userGameRepository.findBySteamId(steamId);
 
         if (games.isEmpty()) {
-            throw new RuntimeException("No games found for steamId=" + steamId);
+            throw new RuntimeException("이 스팀ID에는 게임이 없습니다. 스팀ID를 확인해주세요 : " + steamId);
         }
 
         int gameCount = games.size();
@@ -102,12 +102,22 @@ public class TestService {
         List<String> labels = List.of("Collector", "Achiever", "Explorer", "Socializer", "Killer");
         List<Integer> data = labels.stream().map(scores::get).toList();
 
+        List<String> recommendedGames = switch (bestType) {
+            case "Collector" -> List.of("SteamWorld Collection", "Civilization VI", "No Man's Sky");
+            case "Achiever"  -> List.of("Dark Souls III", "Hollow Knight", "The Binding of Isaac");
+            case "Explorer"  -> List.of("Skyrim", "The Witcher 3", "Elden Ring");
+            case "Socializer" -> List.of("Among Us", "Sea of Thieves", "Fall Guys");
+            case "Killer"    -> List.of("CS:GO", "Dota 2", "PUBG");
+            default -> List.of("Stardew Valley");
+        };
+
         return new TestResultRadarResponse(
                 steamId,
                 bestType,
                 bestScore,
                 labels,
                 data,
+                recommendedGames,
                 result.getCreatedAt()
         );
     }
