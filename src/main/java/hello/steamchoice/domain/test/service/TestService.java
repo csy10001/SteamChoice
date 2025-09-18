@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -104,7 +105,7 @@ public class TestService {
         List<String> labels = List.of("Collector", "Achiever", "Explorer", "Socializer", "Killer");
         List<Integer> data = labels.stream().map(scores::get).toList();
 
-        List<String> recommendedGames = recommendGamesByType(bestType);
+        List<String> recommendedGames = recommendGamesByType(bestType, steamId);
 
         return new TestResultRadarResponse(
                 steamId,
@@ -120,10 +121,14 @@ public class TestService {
     /**
      * 성향별 추천 게임 가져오기 (Steam Store API 활용)
      */
-    private List<String> recommendGamesByType(String type) {
-        Map<String, Object> categories = steamStoreApiClient.getFeaturedCategories();
+    private List<String> recommendGamesByType(String type, String steamId) {
+        // 유저가 보유한 게임 appId 목록
+        Set<Long> ownedAppIds = userGameRepository.findBySteamId(steamId).stream()
+                .map(UserGame::getAppId)
+                .collect(Collectors.toSet());
 
-        // featured categories → 예: top_sellers, specials, coming_soon
+        // Steam Store 인기 게임 카테고리 가져오기
+        Map<String, Object> categories = steamStoreApiClient.getFeaturedCategories();
         Map<?, ?> topSellers = (Map<?, ?>) categories.get("top_sellers");
         List<?> items = (List<?>) topSellers.get("items");
 
@@ -137,9 +142,10 @@ public class TestService {
             default -> List.of("Indie");
         };
 
-        // 인기작 중에서 태그/이름에 키워드 포함된 게임만 추천
+        // 보유 게임 제외 + 키워드 필터링
         return items.stream()
                 .map(o -> (Map<?, ?>) o)
+                .filter(game -> !ownedAppIds.contains(((Number) game.get("id")).longValue())) // ❌ 보유 게임 제외
                 .map(game -> (String) game.get("name"))
                 .filter(name -> keywords.stream().anyMatch(name::contains))
                 .limit(5)
