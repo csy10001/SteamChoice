@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  backend:
+    build: ./backend
+    container_name: steamchoice-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=steamchoice
+      - DB_USERNAME=root
+      - DB_PASSWORD=sook610017!
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - mysql
+      - redis
+
+  mysql:
+    image: mysql:8.0
+    container_name: steamchoice-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=sook610017!
+      - MYSQL_DATABASE=steamchoice
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  redis:
+    image: redis:7.0
+    container_name: steamchoice-redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  mysql_data:
